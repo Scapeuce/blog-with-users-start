@@ -10,7 +10,7 @@ from forms import CreatePostForm, CommentForm
 from forms import RegisterForm, LoginForm
 from functools import wraps
 from flask_gravatar import Gravatar
-
+from pprint import pprint
 app = Flask(__name__)
 app.config['SECRET_KEY'] = '8BYkEfBA6O6donzWlSihBXox7C0sKR6b'
 ckeditor = CKEditor(app)
@@ -34,6 +34,8 @@ class BlogPost(db.Model):
     date = db.Column(db.String(250), nullable=False)
     body = db.Column(db.Text, nullable=False)
     img_url = db.Column(db.String(250), nullable=False)
+    comments = relationship("Comment", back_populates="parent_post")
+
 
 class User(UserMixin, db.Model):
     __tablename__ = "users"
@@ -51,10 +53,13 @@ class Comment(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     author_id = db.Column(db.Integer, db.ForeignKey("users.id"))
     comment_author = relationship("User", back_populates="comments")
+    post_id = db.Column(db.Integer, db.ForeignKey("blog_posts.id"))
+    parent_post = relationship("BlogPost", back_populates="comments")
+
     text = db.Column(db.Text, nullable=False)
 
-db.create_all()
-db.session.commit()
+# db.create_all()
+# db.session.commit()
 
 login_manager = LoginManager()
 login_manager.init_app(app)
@@ -128,10 +133,28 @@ def logout():
     return redirect(url_for('get_all_posts'))
 
 
-@app.route("/post/<int:post_id>")
+@app.route("/post/<int:post_id>", methods=["GET", "POST"])
 def show_post(post_id):
     requested_post = BlogPost.query.get(post_id)
+    all_comments = ["<p>veamos</p>"]
     form = CommentForm()
+    if form.validate_on_submit():
+        print(current_user.name)
+        if current_user.is_authenticated:
+            new_comment = Comment(
+                text=form.comment_text.data,
+                parent_post=requested_post,
+                comment_author=current_user
+            )
+            db.session.add(new_comment)
+            db.session.commit()
+            # all_comments = Comment.query.filter_by(author_id=current_user.id).all()
+
+        else:
+            flash("I'm sorry, you should log in before leaving a comment")
+            return redirect(url_for('login'))
+    print(all_comments)
+
 
     return render_template("post.html", post=requested_post, form=form)
 
