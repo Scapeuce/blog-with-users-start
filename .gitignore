@@ -1,0 +1,6 @@
+venv
+pyproject.toml
+ .idea/
+        __pycache__/
+
+
