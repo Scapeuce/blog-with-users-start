@@ -6,7 +6,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.orm import relationship
 from flask_login import UserMixin, login_user, LoginManager, login_required, current_user, logout_user
-from forms import CreatePostForm
+from forms import CreatePostForm, CommentForm
 from forms import RegisterForm, LoginForm
 from functools import wraps
 from flask_gravatar import Gravatar
@@ -27,7 +27,8 @@ db = SQLAlchemy(app)
 class BlogPost(db.Model):
     __tablename__ = "blog_posts"
     id = db.Column(db.Integer, primary_key=True)
-    author = db.Column(db.String(250), nullable=False)
+    author_id = db.Column(db.Integer, db.ForeignKey("users.id"))
+    author = relationship("User", back_populates="posts")
     title = db.Column(db.String(250), unique=True, nullable=False)
     subtitle = db.Column(db.String(250), nullable=False)
     date = db.Column(db.String(250), nullable=False)
@@ -37,12 +38,23 @@ class BlogPost(db.Model):
 class User(UserMixin, db.Model):
     __tablename__ = "users"
     id = db.Column(db.Integer, primary_key=True)
+
     email = db.Column(db.VARCHAR(100), unique=True, nullable=False)
     password = db.Column(db.VARCHAR(100), unique=False, nullable=False)
     name = db.Column(db.VARCHAR(300), unique=False, nullable=False)
+    posts = relationship("BlogPost", back_populates="author")
+    comments = relationship("Comment", back_populates="comment_author")
 
 
-# db.create_all()
+class Comment(db.Model):
+    __tablename__ = "comments"
+    id = db.Column(db.Integer, primary_key=True)
+    author_id = db.Column(db.Integer, db.ForeignKey("users.id"))
+    comment_author = relationship("User", back_populates="comments")
+    text = db.Column(db.Text, nullable=False)
+
+db.create_all()
+db.session.commit()
 
 login_manager = LoginManager()
 login_manager.init_app(app)
@@ -73,7 +85,7 @@ def get_all_posts():
 def register():
     reg_form = RegisterForm()
     if reg_form.validate_on_submit():
-        print("no debe pasar aun")
+
         hashed_password = generate_password_hash(reg_form.password.data, method='pbkdf2:sha256', salt_length=8)
         new_user = User(
            email=reg_form.email.data,
@@ -119,7 +131,9 @@ def logout():
 @app.route("/post/<int:post_id>")
 def show_post(post_id):
     requested_post = BlogPost.query.get(post_id)
-    return render_template("post.html", post=requested_post)
+    form = CommentForm()
+
+    return render_template("post.html", post=requested_post, form=form)
 
 
 @app.route("/about")
@@ -132,21 +146,27 @@ def contact():
     return render_template("contact.html")
 
 
-@app.route("/new-post")
+@app.route("/new-post", methods=["GET", "POST"])
 @admin_only
 def add_new_post():
     form = CreatePostForm()
+    author = User.query.get(current_user.id)
     if form.validate_on_submit():
+
+
         new_post = BlogPost(
             title=form.title.data,
             subtitle=form.subtitle.data,
             body=form.body.data,
             img_url=form.img_url.data,
             author=current_user,
+
+
             date=date.today().strftime("%B %d, %Y")
         )
         db.session.add(new_post)
         db.session.commit()
+        print(author.name)
         return redirect(url_for("get_all_posts"))
     return render_template("make-post.html", form=form)
 
