@@ -63,8 +63,8 @@ class Comment(db.Model):
 
     text = db.Column(db.Text, nullable=False)
 
-db.create_all()
-db.session.commit()
+# db.create_all()
+# db.session.commit()
 
 login_manager = LoginManager()
 login_manager.init_app(app)
